@@ -1,9 +1,31 @@
-## Project: Deep Learning
+# Project: Deep Learning
 
 ---
 
+## Deviations from the setup envoronment steps
+A GeForce GTX 1080 graphics card was used instead of AWS. As noted in the research notes, tenserflow was discovered to be using the CPU on the computer instead of the GPU. This also explained why increasing the number of workers did not decrease the time to train the model. As a learning experience to utilize the GPU on my computer, the following modifications were made to the setup instructions.
 
-# Required Steps for a Passing Submission:
+Install Cuda 8.0 from Nvidia and any additional patches.
+[Cuda 9.0](https://developer.nvidia.com/cuda-90-download-archive?)
+
+Along with Nvidia cuDNN 5.1 for Cuda 8.0 (Note need an NVidia Developer account)
+[cuDNN](https://developer.nvidia.com/cudnn)
+
+source activate RoboND 
+(if the above throws an error, you can run "activate RoboND" instead)
+
+I had already installed tesnsorflow and according to a thread on stack overflow, [Install instructions](https://stackoverflow.com/questions/44829085/tensorflow-not-running-on-gpu) the CPU version needs to be uninstalled.
+pip uninstall tensorflow
+
+pip install tensorflow-gpu==1.2.1 (changed from tenerflow==1.2.1
+pip install socketIO-client
+pip install transforms3d
+pip install PyQt5
+pip install pyqtgraph
+
+
+
+## Required Steps for a Passing Submission:
 1. Clone the project repo.
 2. Implement a segmentation network in model_training.ipynb.
 3. Optimize network and hyper-parameters.
@@ -16,11 +38,11 @@
 ---
 ### FIll Out Model_training.ipnyb
 
-For the first attempt, code from the segmentation lab was added to the model training and any default parameters in the file are used. An Nvidia1080 graphics card was used instead of AWS
+For the first attempt, code from the segmentation lab was added to the model training and any default parameters in the file are used. 
 
 #### Encoder
 
-The encoder function is used to filter the image data by increasing the depth of the image and decreasing the size of the image. An encoder will allow This can be applied several times until the image data is reduced to a 1x1 convolutional layer.
+The encoder function is used to filter the image data by increasing the depth of the image and decreasing the size of the image. This concept was introduced in the convolutional network lesson.
 
 ```python
 def encoder_block(input_layer, filters, strides):
@@ -30,11 +52,11 @@ def encoder_block(input_layer, filters, strides):
     
     return output_layer
 ```
-
+The supplied code snippet was provided by Lesson 32, section 8 and section 9.
 
 #### Decoder
 
-The decoder function will reassemble an image after it has had the 1x1 convolution applied to it. The concatination allows skip connections to be applied to the network.
+The decoder function will reassemble an image after it has had the 1x1 convolution applied to it. The concatination allows skip connections to be applied to the network and help reassemble the new image.
 
 ```python
 def decoder_block(small_ip_layer, large_ip_layer, filters):
@@ -51,8 +73,11 @@ def decoder_block(small_ip_layer, large_ip_layer, filters):
     return output_layer
 ```
 
+Lessson 32 sections 9 and 10 contained the code needed for the decoder. At the TODO with "Add some number", it is set to a single layer to keep the number of decoder layers equal to the number of encoder layers. If there are still some challenges after apllying more filters, this last todo should be tested with more separable convolution layers.
+
 #### Fully Convolutional Network Model
 
+##### First Run
 The initial step was to test out an FCN with only 1 encoder and decoder layer each. This was to establish a baseline on how additional layers will affect the results of the FCN.
 
 ![FCN_fig_1](./writeup_images/First_FCN.png)
@@ -74,13 +99,16 @@ def fcn_model(inputs, num_classes):
     return layers.Conv2D(num_classes, 1, activation='softmax', padding='same')(x)
 ```
 
-By only using a single encoder and decoder, not enough data was collected for a clear image. 3 layers will be tested out to gain more accurate images.
+##### Second Run
+As mentioned in Lesson 30 Section 5, more layers will be able to pick up additional details and more complex ideas. Following this lesson, it was decided to move on to 3 layers. Section 16 mentions that a The downside is that more layers will increased the amount of time per epoch to train the model.0 
 
 
 
 ### Optimize Network and Parameters
 
-For the initial test, the default parameters were kept as a baseline.
+##### First Run
+
+For the initial test, the default parameters from previous labs were used as a baseline.
 ```python
 learning_rate = 0.1
 batch_size = 64
@@ -90,11 +118,49 @@ validation_steps = 50
 workers = 2
 ```
 
-Since the first training run took about 3 hours, the first parameter to improve was the number of workers. Brute force was utilized to determine the value, starting at 9657 seconds per epoch with two workers and then increasing the number of workers by 1 until the time per epoch began increasing again. It was quickly discovered that 2 was the fastest number with 10085 seconds at 1 worker and 9952 with 3 workers.
+##### Second Run
+Since the first training run took about 3 hours, the first parameter to improve was the number of workers. Brute force was utilized to determine the value, starting at 9657 seconds per epoch with two workers and then increasing the number of workers by 1 until the time per epoch began increasing again. It was quickly discovered that 2 was the fastest number with 10085 seconds at 1 worker and 9952 with 3 workers. After getting the GPU to be utilized, 5 workers decreased the runtime to about 80 seconds per epoch. 
+
+The learning rate of 0.1 was a typo and corrected to a lower rate as Lesson 28 specified that a lower learning rate will achieve a better accuracy. 
+
+Larger batch sizes are crashing, so for now keeping at 32. 
+
+Lesson 28 also indicated that with a learning rate of 0.1 and batch 128, only 80 epochs were needed to improve the accuracy. The starting number is estimated as 20 and the loss will be used to determine if the number is too low or high. 
+
+The reccomended calculation were made for the steps. 
+
+1,184 images in validation and 4,131 images are in the training data folder and the numbers were divided by the batch size and rounded up.
+
+```python
+learning_rate = 0.01
+batch_size = 32
+num_epochs = 100
+steps_per_epoch = 128
+validation_steps = 37
+workers = 5
+```
 
 ### Training the Network
 
-With the initial architecture of one encoder, one decoder, and the default parameters the final score was about 10%.
+##### First Run
+With the initial architecture of one encoder, one decoder, and the default parameters the final score was about 10%. The predictions showed that the full image of the hero was not detected and additional people were also not detected as well.
+
+![predictions_fig_1](./writeup_images/prediction_1.png)
+
+Since additional details were missing, additional filters should be applied to the image.
+
+##### Second Run
+After taking down the kernel with the latest parameters, it was discovered that python was not utilizing the GPU. After getting the GPU tenserflow working, the latest setup resulted in no objects recognized. It is realized that this is because a small number of images are being processed at a time and the epoch number is small.
+
+After getting the GPU up and running, the final score with 3 filters and the new parameters was 37%.
+
+![predictions_fig_2](./writeup_images/prediction_2.png)
+
+The prediction was correct when following the hero, but it missed when the hero was at a distance.
+
+![predictions_fig_2a](./writeup_images/prediction_2a.png)
+
+With the hero being recognized in one dataset. It appears the tuning parameters need to be improved.
 
 ### Future Enhancements
 
