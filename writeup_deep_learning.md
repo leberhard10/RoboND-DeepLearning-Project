@@ -78,7 +78,7 @@ Lessson 32 sections 9 and 10 contained the code needed for the decoder. At the T
 #### Fully Convolutional Network Model
 
 ##### First Run
-The initial step was to test out an FCN with only 1 encoder and decoder layer each. This was to establish a baseline on how additional layers will affect the results of the FCN.
+The initial step was to test out an FCN with only 1 encoder and decoder layer each. This was to establish a baseline on how additional layers will affect the results of the FCN. The 1 by 1 convolution is added after the encoders and before the decoders to create a fully convolutional network. This will allow the software to determine where in the image the hero is so the drone can navigate to the correct location.
 
 ![FCN_fig_1](./writeup_images/First_FCN.png)
 
@@ -102,7 +102,11 @@ def fcn_model(inputs, num_classes):
 ##### Second Run
 As mentioned in Lesson 30 Section 5, more layers will be able to pick up additional details and more complex ideas. Following this lesson, it was decided to move on to 3 layers. Section 16 mentions that a The downside is that more layers will increased the amount of time per epoch to train the model.0 
 
+##### Passing Run
 
+![FCN_fig_2](./writeup_images/Passing_FCN.png)
+
+The FCN that gained a score of 41% had only 2 filters per encoder and decoder. Thiy type of FCN will only detect general shapes and it appeard that adding more would result in too much detail being pulled from the images. 
 
 ### Optimize Network and Parameters
 
@@ -140,6 +144,20 @@ validation_steps = 37
 workers = 5
 ```
 
+##### Passing Run
+
+```python
+learning_rate = 0.01
+batch_size = 32
+num_epochs = 80
+steps_per_epoch = 200
+validation_steps = 100
+workers = 5
+```
+
+The parameter adjustments followed some logical testing, but the suggested calculations did not result in a acore above 40, the actual values of the parameters were guesses. It was understood that increasing the steps would increase the numbers of images used for training and validation in a singe epoch. It was also understood that teh batch size would import more images with each epoch, but it tended to result in crashing with a lack of memory error. The number of epochs will be less with a smaller learning rate, and too large of a number will result in overfitting. Too small of a number will result in inaccurate results.
+
+
 ### Training the Network
 
 ##### First Run
@@ -156,13 +174,49 @@ After getting the GPU up and running, the final score with 3 filters and the new
 
 ![predictions_fig_2](./writeup_images/prediction_2.png)
 
-The prediction was correct when following the hero, but it missed when the hero was at a distance.
+The prediction was correct when following the hero, but it missed when the hero was at a distance. It was also noticed that the smaller images did not have the proper resolution. 
 
 ![predictions_fig_2a](./writeup_images/prediction_2a.png)
 
-With the hero being recognized in one dataset. It appears the tuning parameters need to be improved.
+![predictions_fig_2b](./writeup_images/prediction_2b.png)
+
+There was some uncertanty on if this was the training data or the number of filters. The first thought was to try adding another filter to verify if training or filters will improve the prediction resolution. The suspicion is more filters since the training curve became worse after about 50 epochs.
+
+![predictions_fig_2c](./writeup_images/prediction_2c.png)
+
+##### Passing Run
+See last paragraph of "Additional Testing and Tuning".
+
+
+### Additional Testing and Tuning
+A 4th filter was added and resulted in a score of 38%
+2 Filters resulted in a score of 39%
+Suspicion that the spike close to 60  in the previous predicitons may be a result of overfitting, so the number of epochs was scaled down to 50 and the number of steps per epoch was returned to the default to see if increasing the batches would improve the accuracy.
+
+![predictions_fig_3](./writeup_images/prediction_3.png)
+
+The resulting score of 41% still had trouble spotting the hero at a distance, but this may improve with the 4 filters.
+
+![predictions_fig_3a](./writeup_images/prediction_3a.png)
+
+Increasing the number of filters to 4 filters actually decreased the score to 38%, so the number of filters was scaled back to 3. Since increasing the steps per epoch had improved the score and the validation loss was volatile, the number of validation steps was increased to 100 to test if this was also part of the problem. (Since the number of epochs is decreased to reduce the chance of overfitting, the number of images used per epoch should also be increased to train and validate on larger sample sizes)
+
+This ended up increasing the score to 29%. The next step was to attempt to try bumping the score higher than 41%, so it was returned to 2 filters and the number of epoch was increased to 80. This brought the score back up to 41. The hero was recognized both at a distance and when directly followed.
+
+![predictions_fig_4](./writeup_images/prediction_4.png)
+
+![predictions_fig_4a](./writeup_images/prediction_4a.png)
+
+![predictions_fig_4c](./writeup_images/prediction_4c.png)
+
+The downside to this setup was that there were partial false positives and inanimate objects were kept in the final image.
+
+![predictions_fig_4b](./writeup_images/prediction_4b.png)
+
+![predictions_fig_4d](./writeup_images/prediction_4d.png)
 
 ### Future Enhancements
+To have the network detect objects other than humans, it would need to be trained with datasets that contain and validate for the new object to be detected. 
 
-
+Since additional filters decreased the score, the number of filters will be kept at 2 and the tuning parameters should continue to be improved. The notation made in the decoder should also be looked into since the images have some partial false positives and will show inanimate objects as well when decoding.
 
